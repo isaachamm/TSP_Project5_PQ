@@ -80,7 +80,8 @@ class TSPSolver:
 
     def greedy(self, time_allowance=60.0):
 
-        # use seed 232 on hard(deterministic) to debug
+        # use seed 232 on hard(deterministic) to debug for multiple routes
+        # Check seed 532 on hard(determinsitic) to debug for missing a city? (J)
 
         results = {}
         cities = self._scenario.getCities()
@@ -162,13 +163,35 @@ class TSPSolver:
         foundTour = False
         count = 0
 
-        # todo: call greedy and / or random for initial bssf
-        bssf = math.inf
-        state_subproblems = []
-
-        # todo: add initial state to subproblems set
+        # Get our initial BSSF from greedy, or if that doesn't work, do random
+        bssf = TSPSolver.greedy(self)["soln"]
+        if bssf.cost == math.inf:
+            bssf = TSPSolver.defaultRandomTour(self)["soln"]
 
         start_time = time.time()
+
+        # This is our set of possible problems to approach
+        state_subproblems = []
+        # This assigns id's to every state matrix that we create
+        state_subproblems_counter = 0
+
+        initial_subproblem = Matrix(ncities)
+        initial_subproblem.state_id = state_subproblems_counter
+        state_subproblems_counter += 1
+
+        # This nested for loop creates our initial matrix with the graph's values
+        for i in range(ncities):
+            for j in range(ncities):
+                if i == j:
+                    initial_subproblem.matrix[i][j] = math.inf
+                    continue
+                initial_subproblem.matrix[i][j] = cities[i].costTo(cities[j])
+
+        # Add our initial subproblem to the queue
+        state_subproblems.append(initial_subproblem)
+
+        # todo: reduce the cost of the initial matrix
+
         # todo: fix this while loop using the algorithm
         while state_subproblems and time.time() - start_time < time_allowance:
             route = []

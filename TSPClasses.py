@@ -170,3 +170,15 @@ class City:
 
 		return int(math.ceil(cost * self.MAP_SCALE))
 
+class Matrix:
+	def __init__(self, num_cities):
+		self.matrix = [ [math.inf] * num_cities for i in range(num_cities) ]
+		self.cost_of_matrix = math.inf
+		self.cities_visited = []
+		self.state_id = math.inf
+
+	# def set_matrix:
+	def set_cost(self, cost):
+		self.cost_of_matrix = cost
+	def set_id(self, id_number):
+		self.state_id = id_number
