@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+import math
 
 # from which_pyqt import PYQT_VER
 # if PYQT_VER == 'PYQT5':
@@ -161,7 +162,10 @@ class TSPSolver:
         cities = self._scenario.getCities()
         ncities = len(cities)
         foundTour = False
-        count = 0
+        bssf_updated_count = 0
+        max_states_held = 0
+        total_states_made = 0
+        states_pruned = 0
 
         # Get our initial BSSF from greedy, or if that doesn't work, do random
         bssf = TSPSolver.greedy(self)["soln"]
@@ -171,13 +175,11 @@ class TSPSolver:
         start_time = time.time()
 
         # This is our set of possible problems to approach
-        state_subproblems = []
+        state_subproblems = {}
         # This assigns id's to every state matrix that we create
-        state_subproblems_counter = 0
 
         initial_subproblem = Matrix(ncities)
-        initial_subproblem.state_id = state_subproblems_counter
-        state_subproblems_counter += 1
+        initial_subproblem.state_id = total_states_made
 
         # This nested for loop creates our initial matrix with the graph's values
         for i in range(ncities):
@@ -188,20 +190,73 @@ class TSPSolver:
                 initial_subproblem.matrix[i][j] = cities[i].costTo(cities[j])
 
         # Add our initial subproblem to the queue
-        state_subproblems.append(initial_subproblem)
+        state_subproblems[total_states_made] = initial_subproblem
+        total_states_made += 1
 
-        # todo: reduce the cost of the initial matrix
+        initial_subproblem.reduce_matrix()
 
-        # todo: fix this while loop using the algorithm
         while state_subproblems and time.time() - start_time < time_allowance:
+
+            # Update our max states held, if necessary
+            if len(state_subproblems) > max_states_held:
+                max_states_held = len(state_subproblems)
+
+            # Find the minimum cost matrix in the queue
+            # TODO: come up with a more sophisticated way to choose the next state to expand
+            minimum_sp_id = -1
+            minimum_matrix_cost = math.inf
+            for sp in state_subproblems.values():
+                if sp.cost_of_matrix < minimum_matrix_cost:
+                    minimum_matrix_cost = sp.cost_of_matrix
+                    minimum_sp_id = sp.state_id
+
+            matrix_to_expand = state_subproblems[minimum_sp_id]
+
+            # Expanding
+            for i in range(ncities):
+
+                # This checks to see if our matrix is state 1 – in which case, we need to check all paths (x and y)
+                if not matrix_to_expand.cities_visited:
+
+                    for j in range(ncities):
+
+                        if i == j:
+                            continue
+
+                        new_matrix = Matrix(ncities)
+                        new_matrix.reset_matrix(matrix_to_expand)
+                        new_matrix.set_id(total_states_made)
+                        total_states_made += 1
+
+                        new_matrix.cities_visited.append(i)
+                        new_matrix.cities_visited.append(j)
+
+                        # Set columns and rows to inf
+                        for k in range(ncities):
+                            new_matrix.matrix[i][k] = math.inf
+                            new_matrix.matrix[k][j] = math.inf
+
+                        # Set back-pointer to inf
+                        new_matrix.matrix[j][i] = math.inf
+
+                        new_matrix.reduce_matrix()
+
+                        if new_matrix.cost_of_matrix < bssf.cost:
+                            state_subproblems[new_matrix.state_id] = new_matrix
+
+
+
+
+
+
             route = []
 
         end_time = time.time()
         results['cost'] = bssf.cost if foundTour else math.inf
         results['time'] = end_time - start_time
-        results['count'] = count
+        results['count'] = bssf_updated_count
         results['soln'] = bssf
-        results['max'] = None
+        results['max'] = max_states_held
         results['total'] = None
         results['pruned'] = None
         return results
