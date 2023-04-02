@@ -101,7 +101,7 @@ class TSPSolver:
         curr_city = start_city
         route.append(curr_city)
 
-        while not foundTour: # and time.time() - start_time < time_allowance:
+        while not foundTour and time.time() - start_time < time_allowance:
             minimum_cost = math.inf
             minimum_city = None
 
@@ -184,6 +184,7 @@ class TSPSolver:
 
         initial_subproblem = Matrix(ncities)
         initial_subproblem.state_id = total_states_made
+        initial_subproblem.state_level = 1
 
         # This nested for loop creates our initial matrix with the graph's values
         for i in range(ncities):
@@ -218,8 +219,9 @@ class TSPSolver:
             minimum_sp_id = -1
             minimum_matrix_cost = math.inf
             for sp in state_subproblems.values():
-                if sp.cost_of_matrix < minimum_matrix_cost:
-                    minimum_matrix_cost = sp.cost_of_matrix
+                curr_matrix_cost = sp.cost_of_matrix / (sp.state_level * 2)
+                if curr_matrix_cost< minimum_matrix_cost:
+                    minimum_matrix_cost = curr_matrix_cost
                     minimum_sp_id = sp.state_id
 
             matrix_to_expand = state_subproblems[minimum_sp_id]
@@ -237,18 +239,19 @@ class TSPSolver:
                         if i == j:
                             continue
 
+                        if matrix_to_expand.matrix[i][j] == math.inf:
+                            continue
+
                         new_matrix = Matrix(ncities)
                         new_matrix.reset_matrix(matrix_to_expand)
                         new_matrix.set_id(total_states_made)
+                        new_matrix.state_level = matrix_to_expand.state_level + 1
                         total_states_made += 1
-
-                        if new_matrix.matrix[i][j] == math.inf:
-                            continue
 
                         new_matrix.cities_visited.append(i)
                         new_matrix.cities_visited.append(j)
 
-                        new_matrix.cost_of_matrix += cities[i].costTo(cities[j])
+                        new_matrix.cost_of_matrix += new_matrix.matrix[i][j]
 
                         # Set columns and rows to inf
                         for k in range(ncities):
@@ -262,22 +265,29 @@ class TSPSolver:
 
                         if new_matrix.cost_of_matrix < bssf_matrix.cost_of_matrix:
                             state_subproblems[new_matrix.state_id] = new_matrix
+                        else:
+                            states_pruned += 1
+
                 else:
                     curr_city = matrix_to_expand.cities_visited[-1]
 
                     if i == curr_city or i in matrix_to_expand.cities_visited:
                         continue
 
+                    if matrix_to_expand.matrix[curr_city][i] == math.inf:
+                        continue
+
                     new_matrix = Matrix(ncities)
                     new_matrix.reset_matrix(matrix_to_expand)
                     new_matrix.set_id(total_states_made)
+                    new_matrix.state_level = matrix_to_expand.state_level + 1
                     total_states_made += 1
 
                     if new_matrix.matrix[curr_city][i] == math.inf:
                         continue
 
                     new_matrix.cities_visited.append(i)
-                    new_matrix.cost_of_matrix += cities[curr_city].costTo(cities[i])
+                    new_matrix.cost_of_matrix += new_matrix.matrix[curr_city][i]
 
                     # Set columns and rows to inf
                     for k in range(ncities):
@@ -291,8 +301,8 @@ class TSPSolver:
 
                     # First branch is for a solution, second is to check cost to add to state subproblems set
                     if len(new_matrix.cities_visited) == ncities:
-                        return_cost = cities[new_matrix.cities_visited[-1]].costTo(cities[new_matrix.cities_visited[0]])
-                        new_matrix.cost_of_matrix += return_cost
+                        # return_cost = cities[new_matrix.cities_visited[-1]].costTo(cities[new_matrix.cities_visited[0]])
+                        # new_matrix.cost_of_matrix += return_cost
 
                         if new_matrix.cost_of_matrix < bssf_matrix.cost_of_matrix:
                             bssf_matrix = new_matrix
@@ -300,6 +310,8 @@ class TSPSolver:
                             foundTour = True
                     elif new_matrix.cost_of_matrix < bssf_matrix.cost_of_matrix:
                         state_subproblems[new_matrix.state_id] = new_matrix
+                    else:
+                        states_pruned += 1
 
         # This check means that our greedy algorithm wasn't the optimal solution
         if bssf_matrix.state_id != math.inf:

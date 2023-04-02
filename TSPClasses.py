@@ -172,6 +172,7 @@ class Matrix:
         self.cost_of_matrix = math.inf
         self.cities_visited = []
         self.state_id = math.inf
+        self.state_level = math.inf
 
     # This sets all the values equivalent to that of the new matrix except for the id
     def reset_matrix(self, new_matrix):
@@ -205,7 +206,9 @@ class Matrix:
                 if self.matrix[i][j] < minimum:
                     minimum = self.matrix[i][j]
 
-            if minimum > 0:
+            if minimum == math.inf:
+                reduction_cost = math.inf
+            elif minimum > 0:
                 reduction_cost += minimum
                 for j in range(len(self.matrix)):
                     self.matrix[i][j] -= minimum
@@ -222,7 +225,9 @@ class Matrix:
                 if self.matrix[j][i] < minimum:
                     minimum = self.matrix[j][i]
 
-            if minimum > 0:
+            if minimum == math.inf:
+                reduction_cost = math.inf
+            elif minimum > 0:
                 reduction_cost += minimum
                 for j in range(len(self.matrix)):
                     self.matrix[j][i] -= minimum
