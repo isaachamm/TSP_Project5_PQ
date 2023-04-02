@@ -171,6 +171,8 @@ class TSPSolver:
         if bssf.cost == math.inf:
             bssf = TSPSolver.defaultRandomTour(self)["soln"]
 
+        # The bssf_matrix allows us to compare bssf without having to create the solution every time --
+        #   we only make it once at the end of the algorithm
         bssf_matrix = Matrix(ncities)
         if bssf.cost < math.inf:
             foundTour = True
@@ -178,13 +180,9 @@ class TSPSolver:
 
         start_time = time.time()
 
-        # This is our set of possible problems to approach
-        state_subproblems = {}
-        # This assigns id's to every state matrix that we create
-
         initial_subproblem = Matrix(ncities)
         initial_subproblem.state_id = total_states_made
-        initial_subproblem.state_level = 1
+        initial_subproblem.set_state_level(1)
 
         # This nested for loop creates our initial matrix with the graph's values
         for i in range(ncities):
@@ -194,126 +192,93 @@ class TSPSolver:
                     continue
                 initial_subproblem.matrix[i][j] = cities[i].costTo(cities[j])
 
-        # Add our initial subproblem to the queue
+        initial_subproblem.reduce_matrix()
+
+        # Start city = cities[0] –– we just start from the first city in the list
+        initial_subproblem.cities_visited.append(0)
+
+        # Add our initial subproblem to the queue -- we use total_states made as our key for the dictionary
+        state_subproblems = {}
         state_subproblems[total_states_made] = initial_subproblem
         total_states_made += 1
 
-        initial_subproblem.reduce_matrix()
-
+        # while there are states in the queue and we haven't run out of time
         while state_subproblems and time.time() - start_time < time_allowance:
 
             # Update our max states held, if necessary
             if len(state_subproblems) > max_states_held:
                 max_states_held = len(state_subproblems)
 
-            for sp in list(state_subproblems):
-                if state_subproblems[sp].cost_of_matrix >= bssf_matrix.cost_of_matrix:
-                    state_subproblems.pop(sp)
-                    states_pruned += 1
-
-            if not state_subproblems:
-                break
-
-            # Find the minimum cost matrix in the queue
-            # TODO: come up with a more sophisticated way to choose the next state to expand
+            # Find the minimum cost matrix in the queue -- cost is calculated using matrix cost and the depth of the
+            #   matrix's state
             minimum_sp_id = -1
             minimum_matrix_cost = math.inf
             for sp in state_subproblems.values():
                 curr_matrix_cost = sp.cost_of_matrix / (sp.state_level * 2)
-                if curr_matrix_cost< minimum_matrix_cost:
+                if curr_matrix_cost < minimum_matrix_cost:
                     minimum_matrix_cost = curr_matrix_cost
                     minimum_sp_id = sp.state_id
 
             matrix_to_expand = state_subproblems[minimum_sp_id]
             state_subproblems.pop(minimum_sp_id)
 
-            # Expanding
+            curr_city = matrix_to_expand.cities_visited[-1]
+
+            # Expanding -- checks to expand for every possible city, skips over the ones that have been visited
             for i in range(ncities):
 
-                # This checks to see if our matrix is state 1 – in which case, we need to check all paths (x and y)
-                #   This is only for the expansion of the initial state (when no other cities have been visited)
-                if not matrix_to_expand.cities_visited:
+                if i == curr_city or i in matrix_to_expand.cities_visited:
+                    continue
 
-                    for j in range(ncities):
+                # This makes sure there's a path from the curr_city to the next city
+                if matrix_to_expand.matrix[curr_city][i] == math.inf:
+                    continue
 
-                        if i == j:
-                            continue
+                new_matrix = Matrix(ncities)
+                new_matrix.reset_matrix(matrix_to_expand)
+                new_matrix.set_id(total_states_made)
+                new_matrix.set_state_level(matrix_to_expand.state_level + 1)
+                total_states_made += 1
 
-                        if matrix_to_expand.matrix[i][j] == math.inf:
-                            continue
+                new_matrix.cities_visited.append(i)
+                new_matrix.cost_of_matrix += new_matrix.matrix[curr_city][i]
 
-                        new_matrix = Matrix(ncities)
-                        new_matrix.reset_matrix(matrix_to_expand)
-                        new_matrix.set_id(total_states_made)
-                        new_matrix.state_level = matrix_to_expand.state_level + 1
-                        total_states_made += 1
+                # Set appropriate columns and rows to inf
+                for j in range(ncities):
+                    new_matrix.matrix[curr_city][j] = math.inf
+                    new_matrix.matrix[j][i] = math.inf
 
-                        new_matrix.cities_visited.append(i)
-                        new_matrix.cities_visited.append(j)
+                # Set back-pointer to inf
+                new_matrix.matrix[curr_city][i] = math.inf
 
-                        new_matrix.cost_of_matrix += new_matrix.matrix[i][j]
+                new_matrix.reduce_matrix()
 
-                        # Set columns and rows to inf
-                        for k in range(ncities):
-                            new_matrix.matrix[i][k] = math.inf
-                            new_matrix.matrix[k][j] = math.inf
+                # First branch is for a solution, second is to check cost to add to state_subproblems set
+                if len(new_matrix.cities_visited) == ncities:
 
-                        # Set back-pointer to inf
-                        new_matrix.matrix[j][i] = math.inf
+                    if new_matrix.cost_of_matrix < bssf_matrix.cost_of_matrix:
+                        bssf_matrix = new_matrix
+                        bssf_updated_count += 1
+                        foundTour = True
 
-                        new_matrix.reduce_matrix()
-
-                        if new_matrix.cost_of_matrix < bssf_matrix.cost_of_matrix:
-                            state_subproblems[new_matrix.state_id] = new_matrix
-                        else:
-                            states_pruned += 1
-
-                else:
-                    curr_city = matrix_to_expand.cities_visited[-1]
-
-                    if i == curr_city or i in matrix_to_expand.cities_visited:
-                        continue
-
-                    if matrix_to_expand.matrix[curr_city][i] == math.inf:
-                        continue
-
-                    new_matrix = Matrix(ncities)
-                    new_matrix.reset_matrix(matrix_to_expand)
-                    new_matrix.set_id(total_states_made)
-                    new_matrix.state_level = matrix_to_expand.state_level + 1
-                    total_states_made += 1
-
-                    if new_matrix.matrix[curr_city][i] == math.inf:
-                        continue
-
-                    new_matrix.cities_visited.append(i)
-                    new_matrix.cost_of_matrix += new_matrix.matrix[curr_city][i]
-
-                    # Set columns and rows to inf
-                    for k in range(ncities):
-                        new_matrix.matrix[curr_city][k] = math.inf
-                        new_matrix.matrix[k][i] = math.inf
-
-                    # Set back-pointer to inf
-                    new_matrix.matrix[curr_city][i] = math.inf
-
-                    new_matrix.reduce_matrix()
-
-                    # First branch is for a solution, second is to check cost to add to state subproblems set
-                    if len(new_matrix.cities_visited) == ncities:
-                        # return_cost = cities[new_matrix.cities_visited[-1]].costTo(cities[new_matrix.cities_visited[0]])
-                        # new_matrix.cost_of_matrix += return_cost
-
-                        if new_matrix.cost_of_matrix < bssf_matrix.cost_of_matrix:
-                            bssf_matrix = new_matrix
-                            bssf_updated_count += 1
-                            foundTour = True
-                    elif new_matrix.cost_of_matrix < bssf_matrix.cost_of_matrix:
-                        state_subproblems[new_matrix.state_id] = new_matrix
+                        # Prune everything below the new bssf
+                        for sp in list(state_subproblems):
+                            if state_subproblems[sp].cost_of_matrix >= bssf_matrix.cost_of_matrix:
+                                state_subproblems.pop(sp)
+                                states_pruned += 1
                     else:
                         states_pruned += 1
 
-        # This check means that our greedy algorithm wasn't the optimal solution
+                elif new_matrix.cost_of_matrix < bssf_matrix.cost_of_matrix:
+                    state_subproblems[new_matrix.state_id] = new_matrix
+                else:
+                    states_pruned += 1
+
+        # This adds the leftover states to states_pruned if time runs out
+        if state_subproblems:
+            states_pruned += len(state_subproblems)
+
+        # This checks that our greedy algorithm wasn't the optimal solution
         if bssf_matrix.state_id != math.inf:
             route = []
             for city in bssf_matrix.cities_visited:

@@ -174,7 +174,7 @@ class Matrix:
         self.state_id = math.inf
         self.state_level = math.inf
 
-    # This sets all the values equivalent to that of the new matrix except for the id
+    '''This sets all the values equivalent to that of the new matrix except for state_id and state_level'''
     def reset_matrix(self, new_matrix):
         assert isinstance(new_matrix, Matrix)
         self.matrix = copy.deepcopy(new_matrix.matrix)
@@ -187,14 +187,18 @@ class Matrix:
     def set_id(self, id_number):
         self.state_id = id_number
 
+    def set_state_level(self, level_number):
+        self.state_level = level_number
+
     def reduce_matrix(self):
 
+        # set initial reduction cost (0 for initial state subproblem)
         if self.cost_of_matrix == math.inf:
             reduction_cost = 0
         else:
             reduction_cost = self.cost_of_matrix
 
-        # This one functions for row reduction
+        # This loop functions for row reduction -- (i,j)
         for i in range(len(self.matrix)):
 
             if i in self.cities_visited:
@@ -202,10 +206,13 @@ class Matrix:
                     continue
 
             minimum = math.inf
+
+            # Find the minimum value in a row
             for j in range(len(self.matrix)):
                 if self.matrix[i][j] < minimum:
                     minimum = self.matrix[i][j]
 
+            # if the row is not infinity, subtract the minimum from all the values
             if minimum == math.inf:
                 reduction_cost = math.inf
             elif minimum > 0:
@@ -213,7 +220,7 @@ class Matrix:
                 for j in range(len(self.matrix)):
                     self.matrix[i][j] -= minimum
 
-        # This one functions for column reductions
+        # This loop functions for column reductions -- (j,i)
         for i in range(len(self.matrix)):
 
             if i in self.cities_visited:
@@ -221,10 +228,13 @@ class Matrix:
                     continue
 
             minimum = math.inf
+
+            # Find the minimum value in a column
             for j in range(len(self.matrix)):
                 if self.matrix[j][i] < minimum:
                     minimum = self.matrix[j][i]
 
+            # If the min value is not infinity, subtract it from every value in the column
             if minimum == math.inf:
                 reduction_cost = math.inf
             elif minimum > 0:
@@ -232,4 +242,5 @@ class Matrix:
                 for j in range(len(self.matrix)):
                     self.matrix[j][i] -= minimum
 
+        # Set the matrix's cost to the new reduction cost
         self.set_cost(reduction_cost)
