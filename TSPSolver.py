@@ -17,6 +17,7 @@ import numpy as np
 from TSPClasses import *
 import heapq
 import itertools
+import heapq
 
 
 class TSPSolver:
@@ -198,29 +199,23 @@ class TSPSolver:
         initial_subproblem.cities_visited.append(0)
 
         # Add our initial subproblem to the queue -- we use total_states made as our key for the dictionary
-        state_subproblems = {}
-        state_subproblems[total_states_made] = initial_subproblem
+        state_subproblems_heap = []
+        heapq.heapify(state_subproblems_heap)
+        heapq.heappush(state_subproblems_heap, (initial_subproblem.cost_of_matrix, initial_subproblem.state_id, initial_subproblem))
         total_states_made += 1
 
         # while there are states in the queue and we haven't run out of time
-        while state_subproblems and time.time() - start_time < time_allowance:
+        # while state_subproblems and time.time() - start_time < time_allowance:
+        while state_subproblems_heap and time.time() - start_time < time_allowance:
 
             # Update our max states held, if necessary
-            if len(state_subproblems) > max_states_held:
-                max_states_held = len(state_subproblems)
+            if len(state_subproblems_heap) > max_states_held:
+                max_states_held = len(state_subproblems_heap)
 
-            # Find the minimum cost matrix in the queue -- cost is calculated using matrix cost and the depth of the
-            #   matrix's state
-            minimum_sp_id = -1
-            minimum_matrix_cost = math.inf
-            for sp in state_subproblems.values():
-                curr_matrix_cost = sp.cost_of_matrix / (sp.state_level * 2)
-                if curr_matrix_cost < minimum_matrix_cost:
-                    minimum_matrix_cost = curr_matrix_cost
-                    minimum_sp_id = sp.state_id
+            minimum_sp_id = heapq.heappop(state_subproblems_heap)
 
-            matrix_to_expand = state_subproblems[minimum_sp_id]
-            state_subproblems.pop(minimum_sp_id)
+            matrix_to_expand = minimum_sp_id[2]
+            # state_subproblems.pop(minimum_sp_id[1])
 
             curr_city = matrix_to_expand.cities_visited[-1]
 
@@ -261,22 +256,24 @@ class TSPSolver:
                         bssf_updated_count += 1
                         foundTour = True
 
-                        # Prune everything below the new bssf
-                        for sp in list(state_subproblems):
-                            if state_subproblems[sp].cost_of_matrix >= bssf_matrix.cost_of_matrix:
-                                state_subproblems.pop(sp)
+                        for problem in list(state_subproblems_heap):
+                            if problem[0] >= bssf_matrix.cost_of_matrix:
+                                state_subproblems_heap.remove(problem)
                                 states_pruned += 1
+
+                        heapq.heapify(state_subproblems_heap)
+
                     else:
                         states_pruned += 1
 
                 elif new_matrix.cost_of_matrix < bssf_matrix.cost_of_matrix:
-                    state_subproblems[new_matrix.state_id] = new_matrix
+                    # state_subproblems[new_matrix.state_id] = new_matrix
+                    heapq.heappush(state_subproblems_heap, (new_matrix.cost_of_matrix, new_matrix.state_id, new_matrix))
                 else:
                     states_pruned += 1
 
-        # This adds the leftover states to states_pruned if time runs out
-        if state_subproblems:
-            states_pruned += len(state_subproblems)
+        if state_subproblems_heap:
+            states_pruned += len(state_subproblems_heap)
 
         # This checks that our greedy algorithm wasn't the optimal solution
         if bssf_matrix.state_id != math.inf:
